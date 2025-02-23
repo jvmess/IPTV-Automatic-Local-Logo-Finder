@@ -10,11 +10,11 @@ Python, newest version is probably the best.
 
 Prior to running:
 
-  pip install requests
+    pip install requests
 
-  pip install pyperclip (used to copy it to your clipboard)
+    pip install pyperclip (used to copy it to your clipboard)
 
-  pip install bs4 (web scraper to get logo)
+    pip install bs4 (web scraper to get logo)
 
   Call sign for the channel
 
