@@ -5,48 +5,57 @@ from bs4 import BeautifulSoup
 # Wikipedia page URL
 base_url = 'https://en.wikipedia.org/wiki/'
 
-# Scrape Wikipedia page for main image
+# Identify yourself to Wikipedia so they don't block you
+headers = {
+    'User-Agent': 'LogoFinderBot/1.0 (Contact: your@email.com) Python-requests'
+}
+
 def scrape_image_url(partial_url):
     try:
         page_url = base_url + partial_url
-        res = requests.get(page_url)
+        # Added headers=headers here
+        res = requests.get(page_url, headers=headers)
+        
+        if res.status_code == 404:
+            return None
+        
         res.raise_for_status()
         soup = BeautifulSoup(res.text, 'html.parser')
         infobox = soup.find('table', class_='infobox')
+        
         if infobox:
             img_tag = infobox.find('img')
             if img_tag:
-                return 'https:' + img_tag['src']
+                # Ensure we get the full URL
+                src = img_tag['src']
+                if src.startswith('//'):
+                    return 'https:' + src
+                return src
     except Exception as exc:
-        print(exc)
+        # Silencing common 404s to keep the terminal clean
+        pass
     return None
 
-# Loop to continuously ask for input and fetch image URLs
 while True:
     the_page = input("Enter Wikipedia page title (or press Enter to exit): ").strip().upper()
     if not the_page:
         break
     
-    the_url = scrape_image_url(the_page)
-    
-    # If no image is found, try appending '-TV' and search again
-    if not the_url:
-        print(f"No image file found for {the_page}, trying {the_page}-TV...")
-        the_url = scrape_image_url(the_page + '-TV')
-    
-    # If '-TV' doesn't work, try '-CD'
-    if not the_url:
-        print(f"No image file found for {the_page}-TV, trying {the_page}-CD...")
-        the_url = scrape_image_url(the_page + '-CD')
-    
-    # If '-CD' doesn't work, try '-LD'
-    if not the_url:
-        print(f"No image file found for {the_page}-CD, trying {the_page}-LD...")
-        the_url = scrape_image_url(the_page + '-LD')
-    
+    # List of suffixes to try in order
+    suffixes = ['', '-TV', '-CD', '-LD', '_(TV)']
+    the_url = None
+
+    for suffix in suffixes:
+        current_attempt = the_page + suffix
+        the_url = scrape_image_url(current_attempt)
+        if the_url:
+            break
+        else:
+            print(f"Not found at {current_attempt}...")
+
     if the_url:
-        print(f"Image URL for {the_page}: {the_url}")
-        pyperclip.copy(the_url)  # Copy each URL immediately
-        print("Image URL copied to clipboard!")
+        print(f"Success! Image URL: {the_url}")
+        pyperclip.copy(the_url)
+        print("URL copied to clipboard!")
     else:
-        print(f"No image file found for {the_page}, {the_page}-TV, {the_page}-CD, or {the_page}-LD")
+        print(f"Error: Could not find an image for {the_page} with any common suffix.")
