@@ -1,61 +1,76 @@
 import requests
 import pyperclip
 from bs4 import BeautifulSoup
+import re
 
 # Wikipedia page URL
 base_url = 'https://en.wikipedia.org/wiki/'
 
-# Identify yourself to Wikipedia so they don't block you
+# Custom headers to avoid 403 Forbidden errors
 headers = {
-    'User-Agent': 'LogoFinderBot/1.0 (Contact: your@email.com) Python-requests'
+    'User-Agent': 'TVStationLogoFinder/3.0 (Contact: your@email.com) Python-requests'
 }
 
-def scrape_image_url(partial_url):
+def scrape_image_url(partial_url, index=0):
     try:
         page_url = base_url + partial_url
-        # Added headers=headers here
-        res = requests.get(page_url, headers=headers)
+        res = requests.get(page_url, headers=headers, allow_redirects=True)
         
-        if res.status_code == 404:
+        if res.status_code != 200:
             return None
-        
-        res.raise_for_status()
+
         soup = BeautifulSoup(res.text, 'html.parser')
-        infobox = soup.find('table', class_='infobox')
         
-        if infobox:
-            img_tag = infobox.find('img')
-            if img_tag:
-                # Ensure we get the full URL
-                src = img_tag['src']
-                if src.startswith('//'):
-                    return 'https:' + src
-                return src
-    except Exception as exc:
-        # Silencing common 404s to keep the terminal clean
+        # Find the infobox
+        infobox = soup.find('table', class_='infobox')
+        if not infobox:
+            return None
+
+        # Find all images within the infobox
+        all_imgs = infobox.find_all('img')
+        
+        if all_imgs and len(all_imgs) > index:
+            img_tag = all_imgs[index]
+            src = img_tag['src']
+            if src.startswith('//'):
+                return 'https:' + src
+            return src
+                
+    except Exception:
         pass
     return None
 
+print("--- Wikipedia Logo Finder (Multi-Image Edition) ---")
+print("Format: 'CALLSIGN' for 1st image, 'CALLSIGN 2' for 2nd image.")
+
 while True:
-    the_page = input("Enter Wikipedia page title (or press Enter to exit): ").strip().upper()
-    if not the_page:
+    user_input = input("\nEnter Station (e.g., KJRH or KJRH 2): ").strip()
+    if not user_input:
         break
     
-    # List of suffixes to try in order
+    # Split input to check for a trailing number
+    parts = user_input.split()
+    target_index = 0 # Default to 1st image
+    
+    if len(parts) > 1 and parts[-1].isdigit():
+        target_index = int(parts[-1]) - 1 # Convert "2" to index 1
+        callsign = " ".join(parts[:-1]).upper()
+    else:
+        callsign = user_input.upper()
+
     suffixes = ['', '-TV', '-CD', '-LD', '_(TV)']
     the_url = None
 
     for suffix in suffixes:
-        current_attempt = the_page + suffix
-        the_url = scrape_image_url(current_attempt)
+        attempt = callsign + suffix
+        the_url = scrape_image_url(attempt, index=target_index)
         if the_url:
             break
-        else:
-            print(f"Not found at {current_attempt}...")
-
+    
     if the_url:
-        print(f"Success! Image URL: {the_url}")
+        print(f"✅ Success! Found image #{target_index + 1} for {callsign}")
+        print(f"URL: {the_url}")
         pyperclip.copy(the_url)
-        print("URL copied to clipboard!")
+        print("Copied to clipboard!")
     else:
-        print(f"Error: Could not find an image for {the_page} with any common suffix.")
+        print(f"❌ Error: Could not find image #{target_index + 1} for {callsign}.")
